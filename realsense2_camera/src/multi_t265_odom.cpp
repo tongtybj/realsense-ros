@@ -4,6 +4,7 @@
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 
 #include <nav_msgs/Odometry.h>
+#include <std_srvs/Empty.h>
 
 #include <iostream>
 #include <mutex>
@@ -23,23 +24,18 @@ namespace realsense2_camera
       dev_(dev), pipe_(pipe), frame_(frame),
       base_ros_time_(-1), base_camera_time_(-1), frame_seq_(0)
     {
-      rs2::config cfg;
-      cfg.enable_device(dev_.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
-      cfg.disable_all_streams();
-      cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
+      /* ros param */
+      nhp_.param("reset_duration", reset_duration_, 0.1);
 
-      /* we can only enable fhisheye both image */
-      /*
-        cfg.enable_stream(RS2_STREAM_FISHEYE, 1, RS2_FORMAT_Y8);
-        cfg.enable_stream(RS2_STREAM_FISHEYE, 2, RS2_FORMAT_Y8);
-      */
-      std::cout << dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) << std::endl;
-      std::cout << dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID) << std::endl;
-
-      rs2::pipeline_profile profiles = pipe_.start(cfg, std::bind(&T265Node::frameCb, this, std::placeholders::_1));
+      /* start device */
+      start();
+      ROS_INFO_STREAM("start t265 module: " << dev_.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
 
       /* ros publisher */
       odom_pub_ = nh_.advertise<nav_msgs::Odometry>(frame_ + std::string("/odom"), 10);
+
+      /* ros service */
+      reset_srv_ = nh_.advertiseService(frame_ + "/reset", &T265Node::resetCb, this);
     }
 
     ~T265Node()
@@ -51,6 +47,7 @@ namespace realsense2_camera
     ros::NodeHandle nh_;
     ros::NodeHandle nhp_;
     ros::Publisher odom_pub_;
+    ros::ServiceServer reset_srv_;
 
     rs2::device dev_;
     rs2::pipeline pipe_;
@@ -59,7 +56,38 @@ namespace realsense2_camera
     std::string frame_;
     double base_ros_time_;
     double base_camera_time_;
+    double reset_duration_;
     int frame_seq_;
+
+    void start()
+    {
+      rs2::config cfg;
+      cfg.enable_device(dev_.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+      cfg.disable_all_streams();
+      cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
+
+      /* we can only enable fhisheye both image */
+      /*
+        cfg_.enable_stream(RS2_STREAM_FISHEYE, 1, RS2_FORMAT_Y8);
+        cfg_.enable_stream(RS2_STREAM_FISHEYE, 2, RS2_FORMAT_Y8);
+      */
+
+      rs2::pipeline_profile profiles = pipe_.start(cfg, std::bind(&T265Node::frameCb, this, std::placeholders::_1));
+    }
+
+    bool resetCb(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+    {
+      pipe_.stop();
+
+      //dev_.hardware_reset(); //error: hardware_reset is not implemented for this device!
+      ros::Duration(reset_duration_).sleep();
+
+      start();
+
+      ROS_INFO_STREAM("reset t265 module: " << dev_.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+
+      return true;
+    }
 
     void frameCb(const rs2::frame& frame)
     {
@@ -143,8 +171,8 @@ namespace realsense2_camera
 
     void onInit() override
     {
-      nh_ = getNodeHandle();
-      nhp_ = getPrivateNodeHandle();
+      nh_ = getMTNodeHandle();
+      nhp_ = getMTPrivateNodeHandle();
 
       nhp_.param("frame_prefix", frame_prefix_, std::string("realsense"));
 
