@@ -1,0 +1,8 @@
+<launch>
+
+  <node pkg="nodelet" type="nodelet" name="realsense2_camera_manager" args="manager" output="screen"/>
+
+  <node pkg="nodelet" type="nodelet" name="multi_realsense2_camera" args="load realsense2_camera/MultiT265Odom  realsense2_camera_manager">
+    <param name="frame_prefix" value="realsense" />
+  </node>
+</launch>

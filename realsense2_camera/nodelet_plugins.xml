@@ -1,7 +1,12 @@
 <library path="lib/librealsense2_camera">
-    <class name="realsense2_camera/RealSenseNodeFactory" type="realsense2_camera::RealSenseNodeFactory" base_class_type="nodelet::Nodelet">
-        <description>
-            Example camera nodelet using the Intel RealSense SDK 2.0 library for Intel RealSense SR300 and D400 cameras
-        </description>
-        </class>
- </library>
+  <class name="realsense2_camera/RealSenseNodeFactory" type="realsense2_camera::RealSenseNodeFactory" base_class_type="nodelet::Nodelet">
+    <description>
+      Example camera nodelet using the Intel RealSense SDK 2.0 library for Intel RealSense SR300 and D400 cameras
+    </description>
+  </class>
+  <class name="realsense2_camera/MultiT265Odom" type="realsense2_camera::MultiT265Odom" base_class_type="nodelet::Nodelet">
+    <description>
+      Multi Realsense T265 odometry publisher 
+    </description>
+  </class>
+</library>
