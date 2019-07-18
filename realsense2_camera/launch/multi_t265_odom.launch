@@ -1,9 +1,14 @@
 <launch>
 
+  <arg name="frame_prefix" default = "realsense" />
+  <arg name="throttle_rate" default = "100.0" />
+  <arg name="reset_duration" default = "0.05" />
+
   <node pkg="nodelet" type="nodelet" name="realsense_camera_manager" args="manager" output="screen"/>
 
   <node pkg="nodelet" type="nodelet" name="multi_realsense_camera" args="load realsense2_camera/MultiT265Odom  realsense_camera_manager">
-    <param name="frame_prefix" value="realsense" />
-    <param name="reset_duration" value="0.05" />
+    <param name="frame_prefix" value="$(arg frame_prefix)" />
+    <param name="reset_duration" value="$(arg reset_duration)" />
+    <param name="throttle_rate" value="$(arg throttle_rate)" />
   </node>
 </launch>

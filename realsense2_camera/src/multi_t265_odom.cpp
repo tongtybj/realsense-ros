@@ -22,10 +22,11 @@ namespace realsense2_camera
              rs2::pipeline pipe):
       nh_(nh), nhp_(nhp),
       dev_(dev), pipe_(pipe), frame_(frame),
-      base_ros_time_(-1), base_camera_time_(-1), frame_seq_(0)
+      base_ros_time_(-1), base_camera_time_(-1), prev_time_(0), frame_seq_(0)
     {
       /* ros param */
       nhp_.param("reset_duration", reset_duration_, 0.1);
+      nhp_.param("throttle_rate", throttle_rate_, 100.0);
 
       /* start device */
       start();
@@ -33,6 +34,7 @@ namespace realsense2_camera
 
       /* ros publisher */
       odom_pub_ = nh_.advertise<nav_msgs::Odometry>(frame_ + std::string("/odom"), 10);
+      odom_throttle_pub_ = nh_.advertise<nav_msgs::Odometry>(frame_ + std::string("/odom/throttle"), 10);
 
       /* ros service */
       reset_srv_ = nh_.advertiseService(frame_ + "/reset", &T265Node::resetCb, this);
@@ -47,6 +49,7 @@ namespace realsense2_camera
     ros::NodeHandle nh_;
     ros::NodeHandle nhp_;
     ros::Publisher odom_pub_;
+    ros::Publisher odom_throttle_pub_;
     ros::ServiceServer reset_srv_;
 
     rs2::device dev_;
@@ -57,6 +60,8 @@ namespace realsense2_camera
     double base_ros_time_;
     double base_camera_time_;
     double reset_duration_;
+    double prev_time_;
+    double throttle_rate_;
     int frame_seq_;
 
     void start()
@@ -83,6 +88,9 @@ namespace realsense2_camera
       ros::Duration(reset_duration_).sleep();
 
       start();
+
+      base_ros_time_ = -1;
+      prev_time_ = 0;
 
       ROS_INFO_STREAM("reset t265 module: " << dev_.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
 
@@ -113,39 +121,44 @@ namespace realsense2_camera
           rs2_pose pose = frame.as<rs2::pose_frame>().get_pose_data();
           ros::Time t(base_ros_time_ + (frame_time - base_camera_time_) / 1000.0);
 
+          geometry_msgs::Pose pose_msg;
+          pose_msg.position.x = -pose.translation.z;
+          pose_msg.position.y = -pose.translation.x;
+          pose_msg.position.z = pose.translation.y;
+          pose_msg.orientation.x = -pose.rotation.z;
+          pose_msg.orientation.y = -pose.rotation.x;
+          pose_msg.orientation.z = pose.rotation.y;
+          pose_msg.orientation.w = pose.rotation.w;
+
+          geometry_msgs::Vector3 v_msg;
+          v_msg.x = -pose.velocity.z;
+          v_msg.y = -pose.velocity.x;
+          v_msg.z = pose.velocity.y;
+
+          geometry_msgs::Vector3 om_msg;
+          om_msg.x = -pose.angular_velocity.z;
+          om_msg.y = -pose.angular_velocity.x;
+          om_msg.z = pose.angular_velocity.y;
+
+          nav_msgs::Odometry odom_msg;
+          odom_msg.header.frame_id = frame_ + std::string("_odom_frame");
+          odom_msg.child_frame_id = frame_ + std::string("_pose_frame");
+          odom_msg.header.stamp = t;
+          frame_seq_ ++;
+          odom_msg.header.seq = frame_seq_;
+          odom_msg.pose.pose = pose_msg;
+          odom_msg.twist.twist.linear = v_msg;
+          odom_msg.twist.twist.angular = om_msg;
+
 
           if (odom_pub_.getNumSubscribers() > 0)
-            {
-              geometry_msgs::Pose pose_msg;
-              pose_msg.position.x = -pose.translation.z;
-              pose_msg.position.y = -pose.translation.x;
-              pose_msg.position.z = pose.translation.y;
-              pose_msg.orientation.x = -pose.rotation.z;
-              pose_msg.orientation.y = -pose.rotation.x;
-              pose_msg.orientation.z = pose.rotation.y;
-              pose_msg.orientation.w = pose.rotation.w;
-
-              geometry_msgs::Vector3 v_msg;
-              v_msg.x = -pose.velocity.z;
-              v_msg.y = -pose.velocity.x;
-              v_msg.z = pose.velocity.y;
-
-              geometry_msgs::Vector3 om_msg;
-              om_msg.x = -pose.angular_velocity.z;
-              om_msg.y = -pose.angular_velocity.x;
-              om_msg.z = pose.angular_velocity.y;
-
-              nav_msgs::Odometry odom_msg;
-              frame_seq_ ++;
-
-              odom_msg.header.frame_id = frame_ + std::string("_odom_frame");
-              odom_msg.child_frame_id = frame_ + std::string("_pose_frame");
-              odom_msg.header.stamp = t;
-              odom_msg.header.seq = frame_seq_;
-              odom_msg.pose.pose = pose_msg;
-              odom_msg.twist.twist.linear = v_msg;
-              odom_msg.twist.twist.angular = om_msg;
               odom_pub_.publish(odom_msg);
+
+          if (odom_throttle_pub_.getNumSubscribers() > 0 &&
+              (frame_time - prev_time_) / 1000.0 >=  1 / throttle_rate_)
+            {
+              prev_time_ = frame_time;
+              odom_throttle_pub_.publish(odom_msg);
             }
         }
     }
