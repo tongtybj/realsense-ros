@@ -5,6 +5,7 @@
 
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
+#include <tf/transform_broadcaster.h>
 
 #include <iostream>
 #include <mutex>
@@ -129,16 +130,23 @@ namespace realsense2_camera
           pose_msg.orientation.y = -pose.rotation.x;
           pose_msg.orientation.z = pose.rotation.y;
           pose_msg.orientation.w = pose.rotation.w;
+          tf::Quaternion q;
+          tf::quaternionMsgToTF(pose_msg.orientation, q);
 
           geometry_msgs::Vector3 v_msg;
           v_msg.x = -pose.velocity.z;
           v_msg.y = -pose.velocity.x;
           v_msg.z = pose.velocity.y;
+          tf::Vector3 tf_v;
+          tf::vector3MsgToTF(v_msg,tf_v);
+          tf::vector3TFToMsg(tf::quatRotate(q.inverse(),tf_v), v_msg);
 
           geometry_msgs::Vector3 om_msg;
           om_msg.x = -pose.angular_velocity.z;
           om_msg.y = -pose.angular_velocity.x;
           om_msg.z = pose.angular_velocity.y;
+          tf::vector3MsgToTF(om_msg,tf_v);
+          tf::vector3TFToMsg(tf::quatRotate(q.inverse(),tf_v), om_msg);
 
           nav_msgs::Odometry odom_msg;
           odom_msg.header.frame_id = frame_ + std::string("_odom_frame");
