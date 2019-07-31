@@ -3,6 +3,8 @@
   <arg name="frame_prefix" default = "realsense" />
   <arg name="throttle_rate" default = "100.0" />
   <arg name="reset_duration" default = "0.05" />
+  <arg name="set_module_list" default ="false" />
+  <arg name="module_list_file" default ="" />
 
   <node pkg="nodelet" type="nodelet" name="realsense_camera_manager" args="manager" output="screen"/>
 
@@ -10,5 +12,6 @@
     <param name="frame_prefix" value="$(arg frame_prefix)" />
     <param name="reset_duration" value="$(arg reset_duration)" />
     <param name="throttle_rate" value="$(arg throttle_rate)" />
+    <rosparam file="$(arg module_list_file)" command="load" if="$(arg set_module_list)"/>
   </node>
 </launch>

@@ -1,0 +1,7 @@
+<launch>
+
+  <include file="$(find realsense2_camera)/launch/multi_t265_odom.launch" >
+    <arg name="set_module_list" value="true" />
+    <arg name="module_list_file" value="$(find realsense2_camera)/launch/test.yaml" />
+  </include>
+</launch>

@@ -31,7 +31,6 @@ namespace realsense2_camera
 
       /* start device */
       start();
-      ROS_INFO_STREAM("start t265 module: " << dev_.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
 
       /* ros publisher */
       odom_pub_ = nh_.advertise<nav_msgs::Odometry>(frame_ + std::string("/odom"), 10);
@@ -196,12 +195,58 @@ namespace realsense2_camera
       nhp_ = getMTPrivateNodeHandle();
 
       nhp_.param("frame_prefix", frame_prefix_, std::string("realsense"));
+      nhp_.param("frame_prefix", frame_prefix_, std::string("realsense"));
 
-      int index = 1;
+      ros::V_string serial_no_list{};
+      if(nhp_.hasParam("serial_no_list"))
+        {
+          nhp_.getParam("serial_no_list", serial_no_list);
+          std::cout << "registered module from ros param: \n";
+          for(int j = 0; j < (int)serial_no_list.size(); j++)
+            {
+              std::cout << j +1 << ": " << serial_no_list.at(j) << "\n";
+            }
+          std::cout << std::endl;
+        }
+
+      int i = 1;
+
+      double t = ros::Time::now().toSec();
+      while(ros::ok())
+        {
+          if(ctx_.query_devices().size() > 0) break;
+          ROS_WARN_THROTTLE(1.0, "query realsense t265 devices");
+
+          if(ros::Time::now().toSec() - t > 10.0)
+            {
+              ROS_ERROR("no available realsense t265 devices");
+              return;
+            }
+
+          ros::Duration(0.01).sleep();
+        }
+
       for (auto&& dev : ctx_.query_devices())
         {
+          int index = i;
+          if(serial_no_list.size() > 0)
+            {
+              auto result = std::find(serial_no_list.begin(), serial_no_list.end(), dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+              if (result == serial_no_list.end())
+                {
+                  ROS_WARN_STREAM("can not find conneted module " << dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) << " in the registered list, SKIP!");
+                  continue;
+                }
+              else
+                {
+                  index = std::distance(serial_no_list.begin(), result) + 1;
+                }
+            }
+
           camera_nodes_.push_back(std::make_shared<T265Node>(nh_, nhp_, frame_prefix_ + std::to_string(index), dev, rs2::pipeline(ctx_)));
-          index++;
+
+          ROS_INFO_STREAM("start module" << index<< ": " << dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+          i++;
         }
 
       std::cout << "finishi initialization" << std::endl;
