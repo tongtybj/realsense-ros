@@ -2,7 +2,7 @@
 #include <pluginlib/class_list_macros.h>
 #include <nodelet/nodelet.h>
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
-
+#include <constants.h>
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
 #include <tf/transform_broadcaster.h>
@@ -228,6 +228,14 @@ namespace realsense2_camera
 
       for (auto&& dev : ctx_.query_devices())
         {
+          std::string pid_str(dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID));
+          uint16_t pid = std::stoi(pid_str, 0, 16);
+          if(pid != RS_T265_PID)
+            {
+              ROS_WARN_STREAM("Can not support device other than t265!, the ID of this device is 0x " << pid_str);
+              continue;
+            }
+
           int index = i;
           if(serial_no_list.size() > 0)
             {
